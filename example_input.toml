@@ -1,0 +1,24 @@
+dimension = 1
+
+[Grid]
+    path = "./testgrid.grid"
+
+
+[MaterialDefault]
+    id = 1
+    density = 10.4
+    horizon = 3.014
+
+
+[[BC]]
+    displacement = [0, 0, 0]
+    [[BC.include]]
+        sphere = [0,0,0,10]
+    [[BC.exclude]]
+        cuboid = [0, 0, 0, 1, 1, 1]
+    [[BC.exclude]]
+        sphere = [0, 0, 0, 1, 1, 1]
+    [[BC.exclude]]
+        material = 1
+
+[Output]

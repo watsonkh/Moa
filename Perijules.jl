@@ -33,6 +33,17 @@ mutable struct Grid
     materials::Vector{Material}
 end
 
+function parse_grid(filepath::String, skiprow::Bool)
+    np = PyCall.pyimport("numpy")
+    if skiprow
+        input_matrix = np.loadtxt(filepath, skiprows=1)
+    else
+        input_matrix = np.loadtxt(filepath)
+    end
+    
+    print(size(input_matrix))
+end
+
 
 function legacy_parse_grid(filepath::String)
     np = PyCall.pyimport("numpy")
@@ -66,7 +77,8 @@ println("\tMaterial Size: ",    sizeof(Material))
 println("\tNode Size: ",        sizeof(Node))
 println("\tGrid Size: ",        sizeof(Grid), "\n\n")
 
-println("Nodes:\n",legacy_parse_grid("testgrid.grid"))
+# println("Nodes:\n",legacy_parse_grid("testgrid.grid"))
+parse_grid("testgrid.grid", true)
 # np = PyCall.pyimport("numpy")
 # input_matrix = np.loadtxt("testgrid.grid", skiprows=1)
 
