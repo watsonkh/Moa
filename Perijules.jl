@@ -1,10 +1,7 @@
 import Pkg
 Pkg.activate(".")
 
-using StaticArrays
-import PyCall
 import NearestNeighbors
-using LinearAlgebra
 
 
 # Global (for now) varibles
@@ -19,7 +16,12 @@ module PD
 end
 
 
-
+# TOOD for tensile bundle:
+# Nonlinear force response
+# Force plane
+# Material interface
+# Bond failure
+# Staged loading BC
 
 
 ## Initialize grid
