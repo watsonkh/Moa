@@ -1,0 +1,7 @@
+# This is a comment (you can have blank lines too)
+
+x, y, z, material
+# First point is at 0, 0, 0 and is associated with material 1
+0, 0, 0, 1
+1, 0, 0, 2
+4, 0, 0, 2

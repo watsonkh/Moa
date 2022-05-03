@@ -1,13 +1,12 @@
 dimension = 1
+horizon = 3.014
 
-[Grid]
-    path = "./testgrid.grid"
-
+[[Grid]]
+    path = "twopoints.grid"
 
 [MaterialDefault]
     id = 1
     density = 10.4
-    horizon = 3.014
 
 
 [[BC]]
