@@ -4,7 +4,7 @@ mutable struct Node
     position::MVector{3, Float64}
     displacement::MVector{3, Float64}
     velocity::MVector{3, Float64}
-    force::MVector{3, Float64}
+    @atomic force::MVector{3, Float64}
     volume::Float64
     material::Material
 end

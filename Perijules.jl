@@ -3,9 +3,10 @@ Pkg.activate(".")
 
 import NearestNeighbors
 using StaticArrays
+using LinearAlgebra
 
 # Global (for now) varibles
-grid_spacing = 2.
+grid_spacing = 1.
 horizon = grid_spacing * 3.014
 
 
@@ -61,11 +62,13 @@ println("Created ", length(bonds), " bonds!")
 
 # Time iteration
 node_a_position = Vector{Float64}() # used to record a node's dispalcement
-node_b_position = Vector{Float64}() # used to record a node's dispalcement
+node_b_position = Vector{Float64}() # used to record b node's dispalcement
+ke_his = Vector{Float64}() # used to record kinetic energy
 
-nodes[2].velocity[1] = 1.5
+nodes[2].velocity[1] = 0.5
+
 dt = grid_spacing / sqrt(maximum([material.bond_constant/material.density for material in materials])) * 0.01
-for time_step in 1:10000
+for time_step in 1:1000
     for node in nodes
         # Average velocity for the time step assuming constant acceleration
         node.velocity = node.velocity + (dt*0.5)*(node.force/(node.volume*node.material.density))
@@ -74,14 +77,15 @@ for time_step in 1:10000
         node.displacement += node.velocity * dt
 
         # Zero out force
-        node.force *= 0
+        @atomic node.force = zeros(3)
     end
 
     # Apply displacement BCs
     nodes[1].displacement[1] = 0.
+    nodes[1].velocity[1] = 0.
 
     # Calculate forces and break bonds
-    for bond in bonds
+    Threads.@threads for bond in bonds
         if PD.should_break(bond)
             PD.break!(bond)
         end
@@ -96,11 +100,11 @@ for time_step in 1:10000
 
     push!(node_a_position, nodes[1].position[1] + nodes[1].displacement[1])
     push!(node_b_position, nodes[2].position[1] + nodes[2].displacement[1])
+    push!(ke_his,sum([0.5 * node.volume * node.material.density * (norm(node.velocity)^2) for node in nodes]))
     # println(PD.should_break(bonds[1]))
 end
-
-
+println("Finished time loop!")
 
 # Plot the two points' deformed position
 import Plots
-Plots.plot([node_a_position,node_b_position])
+Plots.plot([node_a_position,node_b_position, ke_his], label=["node a" "node b" "kinetic energy"])

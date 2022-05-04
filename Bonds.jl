@@ -30,7 +30,7 @@ end
 
 "Applies the bond's force to its from node (NOT THREAD SAFE)"
 function apply_force(bond::Bond)
-    bond.from.force += get_force(bond)
+    @atomic bond.from.force += get_force(bond)
 end
 
 function should_break(bond::Bond)
