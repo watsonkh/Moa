@@ -2,7 +2,7 @@ import Pkg
 Pkg.activate(".")
 
 import NearestNeighbors
-
+using StaticArrays
 
 # Global (for now) varibles
 grid_spacing = 2.
@@ -17,18 +17,17 @@ end
 
 
 # TOOD for tensile bundle:
-# Nonlinear force response
-# Force plane
-# Material interface
-# Bond failure
-# Staged loading BC
+    # Nonlinear force response
+    # Force plane
+    # Material interface
+    # Staged loading BC
 
 
-## Initialize grid
+# Initialize grid
 # Create Materials
 materials = Vector{PD.Material}()
-push!(materials, PD.Material(1, 1., 0.2, 75))
-push!(materials, PD.Material(2, 1., 0.2, 76))
+push!(materials, PD.Material(1, 1., 0.1, 75))
+push!(materials, PD.Material(2, 1., 0.1, 76))
 println("Created ", length(materials), " materials!")
 
 # Create Nodes (this process allows the nodes and position vector of vectors to point to the same thing)
@@ -60,12 +59,11 @@ println("Created ", length(bonds), " bonds!")
 
 
 
-## Time iteration
+# Time iteration
 node_a_position = Vector{Float64}() # used to record a node's dispalcement
 node_b_position = Vector{Float64}() # used to record a node's dispalcement
 
-nodes[2].displacement[1] = 0.1
-
+nodes[2].velocity[1] = 1.5
 dt = grid_spacing / sqrt(maximum([material.bond_constant/material.density for material in materials])) * 0.01
 for time_step in 1:10000
     for node in nodes
@@ -74,14 +72,19 @@ for time_step in 1:10000
 
         # Update displacement with average velocity
         node.displacement += node.velocity * dt
+
+        # Zero out force
         node.force *= 0
     end
 
     # Apply displacement BCs
     nodes[1].displacement[1] = 0.
 
-    # Calculate forces
+    # Calculate forces and break bonds
     for bond in bonds
+        if PD.should_break(bond)
+            PD.break!(bond)
+        end
         # Eventually replace node.force with atomic floats and use threading for this loop
         PD.apply_force(bond)
     end
@@ -93,6 +96,7 @@ for time_step in 1:10000
 
     push!(node_a_position, nodes[1].position[1] + nodes[1].displacement[1])
     push!(node_b_position, nodes[2].position[1] + nodes[2].displacement[1])
+    # println(PD.should_break(bonds[1]))
 end
 
 
