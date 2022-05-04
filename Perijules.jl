@@ -19,9 +19,10 @@ end
 
 # TOOD for tensile bundle:
     # Nonlinear force response
-    # Force plane
+    # Reading in and creating materials
     # Material interface
     # Staged loading BC
+    # Force plane
 
 
 # Initialize grid
@@ -69,7 +70,7 @@ nodes[2].velocity[1] = 0.5
 
 dt = grid_spacing / sqrt(maximum([material.bond_constant/material.density for material in materials])) * 0.01
 for time_step in 1:1000
-    for node in nodes
+    Threads.@threads for node in nodes
         # Average velocity for the time step assuming constant acceleration
         node.velocity = node.velocity + (dt*0.5)*(node.force/(node.volume*node.material.density))
 
@@ -93,7 +94,7 @@ for time_step in 1:1000
         PD.apply_force(bond)
     end
 
-    for node in nodes
+    Threads.@threads for node in nodes
         # Calculate final velocity
         node.velocity = node.velocity + dt*0.5 * (node.force / (node.volume * node.material.density))
     end
@@ -101,7 +102,6 @@ for time_step in 1:1000
     push!(node_a_position, nodes[1].position[1] + nodes[1].displacement[1])
     push!(node_b_position, nodes[2].position[1] + nodes[2].displacement[1])
     push!(ke_his,sum([0.5 * node.volume * node.material.density * (norm(node.velocity)^2) for node in nodes]))
-    # println(PD.should_break(bonds[1]))
 end
 println("Finished time loop!")
 
