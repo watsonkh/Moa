@@ -22,6 +22,7 @@ end
     # Nonlinear force response
     # Material interface
     # Staged loading BC
+    # Contact algorithm
 
 
 
@@ -55,7 +56,7 @@ bonds = Vector{PD.Bond}()
 spatial = PyCall.pyimport_conda("scipy.spatial", "scipy", "anaconda")
 tree = spatial.KDTree(positions);
 py_neighbor_list = tree.query_ball_point(positions, horizon, workers=-1);
-neighbor_list = Vector{Vector{Int64}}(py_neighbor_list)
+neighbor_list = Vector{Vector{Int64}}(py_neighbor_list);
 
 for (i, result) in enumerate(neighbor_list)
     for neighbor in result
@@ -109,8 +110,8 @@ for time_step in 1:1000
         PD.apply_force(bond)
     end
 
-    push!(FP_his, sum([PD.get_force(bond) for bond in FP_positive_bonds]) -
-     sum([PD.get_force(bond) for bond in FP_negative_bonds]))
+    push!(FP_his, sum([PD.get_force(bond)[1] for bond in FP_positive_bonds]) -
+     sum([PD.get_force(bond)[1] for bond in FP_negative_bonds]))
 
     Threads.@threads for node in nodes
         # Calculate final velocity
@@ -125,4 +126,4 @@ println("Finished time loop!")
 
 # Plot the two points' deformed position
 import Plots
-Plots.plot(ke_his, label=["kinetic energy"])
+Plots.plot(FP_his, label=["Force plane apply_force"])
