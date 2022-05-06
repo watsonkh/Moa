@@ -22,6 +22,7 @@ end
     # Nonlinear force response
     # Material interface
     # Staged loading BC
+    # Fixed-radius nearest neighbor search (Cell list)
     # Contact algorithm
 
 
@@ -68,23 +69,39 @@ for (i, result) in enumerate(neighbor_list)
 end
 println("Created ", length(bonds), " bonds!")
 
-## Plot initial grid
+## Plotting with pyvista
 pv = PyCall.pyimport_conda("pyvista", "pyvista", "conda-forge")
 point_cloud = pv.PolyData([node.position for node in nodes])
 plotter = pv.Plotter()
 plotter.add_mesh(point_cloud, scalars=material_numbers, cmap="plasma")
 plotter.show()
-##
 
+
+## Staged Loading
+
+#= Requirements:
+    ✓ Define points
+    Prevent failure
+    Move labeled points (keep constrained)
+    Wait for KE to go under a threshold (but wait a minimum number of time steps first)
+    Allow failure (for a few timesteps)
+    Repeat
+=#
+
+SL_positive_points = [node for node in nodes if node.position[1] >  950]
 SL_negative_points = [node for node in nodes if node.position[1] < -950]
-SL_positive_points = [node for node in nodes if node.position[1] > 950]
+SL_iteration_count = 1
+SL_increment = 0.01
+SL_ke_threshold = 0.1
+SL_should_increment = true
+SL_should_fail = false
 
+## Force Plane
 FP_positive_bonds = [bond for bond in bonds if (bond.from.position[1] < 0 && bond.to.position[1] > 0)]
 FP_negative_bonds = [bond for bond in bonds if (bond.from.position[1] > 0 && bond.to.position[1] < 0)]
 FP_his = Vector{Float64}()
 
-##
-
+## 
 # Time iteration
 ke_his = Vector{Float64}() # used to record kinetic energy
 
@@ -101,17 +118,29 @@ for time_step in 1:1000
         @atomic node.force = zeros(3)
     end
 
-    # Calculate forces and break bonds
+    # Staged loading: constrain tabs
+    Threads.@threads for node in SL_positive_points
+        node.displacement = [1.,0.,0.] * SL_iteration_count * SL_increment
+        node.velocity = zeros(3)
+    end
+    Threads.@threads for node in SL_negative_points
+        node.displacement = -[1.,0.,0.] * SL_iteration_count * SL_increment
+        node.velocity = zeros(3)
+    end
+
+    # Break bonds
     Threads.@threads for bond in bonds
         if PD.should_break(bond)
             PD.break!(bond)
         end
-        # Eventually replace node.force with atomic floats and use threading for this loop
+    end
+
+    # Apply bond force to nodes
+    Threads.@threads for bond in bonds
         PD.apply_force(bond)
     end
 
-    push!(FP_his, sum([PD.get_force(bond)[1] for bond in FP_positive_bonds]) -
-     sum([PD.get_force(bond)[1] for bond in FP_negative_bonds]))
+    push!(FP_his, sum([PD.get_force(bond)[1] for bond in FP_positive_bonds]) - sum([PD.get_force(bond)[1] for bond in FP_negative_bonds]))
 
     Threads.@threads for node in nodes
         # Calculate final velocity
@@ -119,7 +148,9 @@ for time_step in 1:1000
     end
 
     kinetic_energy = sum([0.5 * node.volume * node.material.density * (norm(node.velocity)^2) for node in nodes])
+
     push!(ke_his, sum([0.5 * node.volume * node.material.density * (norm(node.velocity)^2) for node in nodes]))
+
     println(time_step)
 end
 println("Finished time loop!")
