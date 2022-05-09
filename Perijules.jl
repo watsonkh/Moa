@@ -136,7 +136,7 @@ for time_step in 1:8000
             SL_last_dynamic_time_step = time_step
             SL_iteration_count += 1
             println("NEW STAGE ##############################")
-            push!(FP_his, sum([PD.get_force(bond)[1] for bond in FP_positive_bonds]) - sum([PD.get_force(bond)[1] for bond in FP_negative_bonds]))
+            push!(FP_his, (sum([PD.get_force(bond)[1] for bond in FP_positive_bonds]) - sum([PD.get_force(bond)[1] for bond in FP_negative_bonds]))*0.5)
             push!(disp_his, SL_iteration_count * SL_increment)
         end
     end
