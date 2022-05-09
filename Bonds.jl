@@ -4,6 +4,7 @@ mutable struct Bond
     to::PD.Node
     isBroken::Bool
 end
+Bond(from::PD.Node, to::PD.Node) = Bond(from, to, false)
 
 function get_strain(bond::Bond)
     initial_bond_length = norm(bond.to.position - bond.from.position)
@@ -11,7 +12,6 @@ function get_strain(bond::Bond)
     deformed_bond_length = norm(deformed_bond_vector)
     return (deformed_bond_length - initial_bond_length) / initial_bond_length
 end
-
 
 "Returns the force of the bond with the minimum material properties"
 function get_force(bond::Bond)
@@ -38,6 +38,7 @@ function should_break(bond::Bond)
 end
 
 function break!(bond::Bond)
+    # println("SNAPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP")
     bond.isBroken = true
 end
 
