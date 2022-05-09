@@ -1,3 +1,11 @@
+    
+    module PD
+    include("Materials.jl")
+    include("Nodes.jl")
+    include("Bonds.jl")
+    include("CellList.jl")
+end
+
 import Pkg
 Pkg.activate(".")
 
@@ -6,29 +14,17 @@ using StaticArrays
 using LinearAlgebra
 import PyCall
 
+
 # Global (for now) varibles
-grid_spacing = 1.
+grid_spacing = 2.
 horizon = grid_spacing * 3.014
-
-
-module PD
-    include("Materials.jl")
-    include("Nodes.jl")
-    include("Bonds.jl")
-end
 
 
 # TOOD for tensile bundle:
     # Nonlinear force response
     # Material interface
-    # Staged loading BC
-    # Fixed-radius nearest neighbor search (Cell list)
     # Contact algorithm
 
-
-
-
-# Initialize grid
 
 # Read in input grid
 np = PyCall.pyimport("numpy")
@@ -49,64 +45,44 @@ for (i, position) in enumerate(eachrow(positions))
     material = [material for material in materials if material.id == material_numbers[i]][1]
     push!(nodes, PD.Node(MVector{3, Float64}(position), material, grid_spacing))
 end
-
 println("Created ", length(nodes), " nodes!")
 
 # Create Bonds (double bonded)
 bonds = Vector{PD.Bond}()
-spatial = PyCall.pyimport_conda("scipy.spatial", "scipy", "anaconda")
-tree = spatial.KDTree(positions);
-py_neighbor_list = tree.query_ball_point(positions, horizon, workers=-1);
-neighbor_list = Vector{Vector{Int64}}(py_neighbor_list);
-
-for (i, result) in enumerate(neighbor_list)
-    for neighbor in result
-        n = neighbor+1
-        if i != n
-            push!(bonds, PD.Bond(nodes[i], nodes[n], false))
-        end
+cell_list = PD.create_cell_list(nodes, horizon);
+for node in nodes
+    # Can have lots of optimizations here
+    for other in PD.sample_cell_list(cell_list, node, horizon)
+        push!(bonds, PD.Bond(node, other, false))
     end
 end
 println("Created ", length(bonds), " bonds!")
 
-## Plotting with pyvista
-pv = PyCall.pyimport_conda("pyvista", "pyvista", "conda-forge")
-point_cloud = pv.PolyData([node.position for node in nodes])
-plotter = pv.Plotter()
-plotter.add_mesh(point_cloud, scalars=material_numbers, cmap="plasma")
-plotter.show()
 
+# Staged Loading
 
-## Staged Loading
-
-#= Requirements:
-    ✓ Define points
-    Prevent failure
-    Move labeled points (keep constrained)
-    Wait for KE to go under a threshold (but wait a minimum number of time steps first)
-    Allow failure (for a few timesteps)
-    Repeat
-=#
-
+# 1 - displace and relax
+# 2 - fail and relax
+SL_stage = 1
 SL_positive_points = [node for node in nodes if node.position[1] >  950]
 SL_negative_points = [node for node in nodes if node.position[1] < -950]
 SL_iteration_count = 1
-SL_increment = 0.01
-SL_ke_threshold = 0.1
-SL_should_increment = true
-SL_should_fail = false
+SL_increment = 10.
+SL_last_dynamic_time_step = 1
 
-## Force Plane
+# Force Plane
 FP_positive_bonds = [bond for bond in bonds if (bond.from.position[1] < 0 && bond.to.position[1] > 0)]
 FP_negative_bonds = [bond for bond in bonds if (bond.from.position[1] > 0 && bond.to.position[1] < 0)]
 FP_his = Vector{Float64}()
-
-## 
+disp_his = Vector{Float64}()
 # Time iteration
 ke_his = Vector{Float64}() # used to record kinetic energy
 
 dt = grid_spacing / sqrt(maximum([material.bond_constant/material.density for material in materials])) * 0.01
-for time_step in 1:1000
+
+
+for time_step in 1:8000
+
     Threads.@threads for node in nodes
         # Average velocity for the time step assuming constant acceleration
         node.velocity = node.velocity + (dt*0.5)*(node.force/(node.volume*node.material.density))
@@ -128,10 +104,12 @@ for time_step in 1:1000
         node.velocity = zeros(3)
     end
 
-    # Break bonds
-    Threads.@threads for bond in bonds
-        if PD.should_break(bond)
-            PD.break!(bond)
+    if SL_stage == 2
+        # Break bonds
+        Threads.@threads for bond in bonds
+            if PD.should_break(bond)
+                PD.break!(bond)
+            end
         end
     end
 
@@ -140,21 +118,45 @@ for time_step in 1:1000
         PD.apply_force(bond)
     end
 
-    push!(FP_his, sum([PD.get_force(bond)[1] for bond in FP_positive_bonds]) - sum([PD.get_force(bond)[1] for bond in FP_negative_bonds]))
 
     Threads.@threads for node in nodes
         # Calculate final velocity
         node.velocity = node.velocity + dt*0.5 * (node.force / (node.volume * node.material.density))
+        node.velocity *= 0.99
     end
 
     kinetic_energy = sum([0.5 * node.volume * node.material.density * (norm(node.velocity)^2) for node in nodes])
+    if kinetic_energy < 0.0025
+        if SL_stage == 1 time_step - SL_last_dynamic_time_step > 50
+            SL_stage = 2
+            SL_last_dynamic_time_step = time_step
+        end
+        if SL_stage == 2 && time_step - SL_last_dynamic_time_step > 50
+            SL_stage = 1
+            SL_last_dynamic_time_step = time_step
+            SL_iteration_count += 1
+            println("LUGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+            push!(FP_his, sum([PD.get_force(bond)[1] for bond in FP_positive_bonds]) - sum([PD.get_force(bond)[1] for bond in FP_negative_bonds]))
+            push!(disp_his, SL_iteration_count * SL_increment)
+        end
+    end
+    push!(ke_his, kinetic_energy)
 
-    push!(ke_his, sum([0.5 * node.volume * node.material.density * (norm(node.velocity)^2) for node in nodes]))
-
-    println(time_step)
+    println(time_step, ": ", kinetic_energy)
 end
-println("Finished time loop!")
+# println("Finished time loop!")
 
 # Plot the two points' deformed position
 import Plots
-Plots.plot(FP_his, label=["Force plane apply_force"])
+# Plots.plot(FP_his, label=["Force plane apply_force"])
+Plots.plot(ke_his, label="Kinetic Energy")
+
+# SL_iteration_count
+
+
+## Plotting with pyvista
+pv = PyCall.pyimport_conda("pyvista", "pyvista", "conda-forge")
+point_cloud = pv.PolyData([node.position+node.displacement for node in nodes])
+plotter = pv.Plotter()
+plotter.add_mesh(point_cloud, scalars=[node.displacement[1] for node in nodes], cmap="plasma")
+plotter.show()
