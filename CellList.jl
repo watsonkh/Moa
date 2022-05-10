@@ -31,30 +31,72 @@ function create_cell_list(nodes::Vector{Main.PD.Node}, radius::Float64)
         end
     end
     shape = (dim_max - dim_min) / radius
-    println("Max: ", dim_max)
-    println("Min: ", dim_min)
-    println("Shape: ", shape)
+    size1,size2,size3 = Int64(ceil(shape[1]))+1, Int64(ceil(shape[2]))+1,Int64(ceil(shape[3]))+1
 
-    data = Array{Vector{Main.PD.Node}}(undef,
-                                            Int64(ceil(shape[1]))+1,
-                                            Int64(ceil(shape[2]))+1,
-                                            Int64(ceil(shape[3]))+1);
+    data = Array{Vector{Main.PD.Node}}(undef,size1,size2,size3);
     for i in eachindex(data)
         data[i] = Vector{Main.PD.Node}()
     end
-    println("Created cell list: ", size(data))
+
+
     for node in nodes
         # Insert node
         pos = node.position + node.displacement
-        # println(pos)
-        push!(data[
-            Int64(ceil((pos[1] - dim_min[1]) / radius))+1,
-            Int64(ceil((pos[2] - dim_min[2]) / radius))+1,
-            Int64(ceil((pos[3] - dim_min[3]) / radius))+1
-            ], node)
+        # index = []
+        push!(data[Int64(ceil((pos[1] - dim_min[1]) / radius))+1,
+                    Int64(ceil((pos[2] - dim_min[2]) / radius))+1,
+                    Int64(ceil((pos[3] - dim_min[3]) / radius))+1], node)
     end
 
+        
+    println("Created cell list: ", size(data))
     return CellList(data, radius, dim_min, dim_max)
+end
+
+function create_cell_list_new(nodes::Vector{Main.PD.Node}, radius::Float64)
+    # Can be optimized
+    positions = [node.position + node.displacement for node in nodes]
+    dim_max = copy(positions[1])
+    dim_min = copy(positions[1])
+    for position in positions
+        if position[1] > dim_max[1]
+            dim_max[1] = position[1]
+        end
+        if position[2] > dim_max[2]
+            dim_max[2] = position[2]
+        end
+        if position[3] > dim_max[3]
+            dim_max[3] = position[3]
+        end
+        if position[1] < dim_min[1]
+            dim_min[1] = position[1]
+        end
+        if position[2] < dim_min[2]
+            dim_min[2] = position[2]
+        end
+        if position[3] < dim_min[3]
+            dim_min[3] = position[3]
+        end
+    end
+    shape = (dim_max - dim_min) / radius
+    size1,size2,size3 = Int64(ceil(shape[1]))+1, Int64(ceil(shape[2]))+1,Int64(ceil(shape[3]))+1
+
+    a = Vector{Array{Vector{Main.PD.Node},3}}()
+    for i in 1:Threads.nthreads()
+        b = Array{Vector{Main.PD.Node}}(undef,size1,size2,size3)
+        for j in eachindex(b)
+            b[j] = Vector{Main.PD.Node}()
+        end
+        push!(a, b)
+    end
+
+    Threads.@threads for node in nodes
+        # Insert node
+        pos = node.position + node.displacement
+        index1, index2, index3 = Int64(ceil((pos[1] - dim_min[1]) / radius))+1, Int64(ceil((pos[2] - dim_min[2]) / radius))+1, Int64(ceil((pos[3] - dim_min[3]) / radius))+1
+        push!(a[Threads.threadid()][index1, index2, index3], node)
+    end
+    return CellList(vcat(a...), radius, dim_min, dim_max)
 end
 
 function sample_cell_list(cell_list::CellList, node::Main.PD.Node, radius::Float64)
@@ -89,6 +131,11 @@ end
 
 # push!(nodes, Main.PD.Node(-1.5,-1.1,-1.3,mat, 1.))
 # push!(nodes, Main.PD.Node(1.4,1.6,1.8,mat, 1.))
+
+# @time create_cell_list(nodes, 0.7);
+# @time create_cell_list_new(nodes, 0.7);
+
+# Threads.nthreads()
 
 
 

@@ -13,14 +13,10 @@ using StaticArrays
 using LinearAlgebra
 import PyCall
 
-# function lerp(from::Float64, )
-
-# end
 
 # Global (for now) varibles
 grid_spacing = 2.
 horizon = grid_spacing * 3.014
-
 
 # Create material
 materials = Vector{PD.Material}()
@@ -51,7 +47,6 @@ FP_positive_bonds = [bond for bond in cntBonds if (bond.from.position[1] < 5 && 
 FP_negative_bonds = [bond for bond in cntBonds if (bond.from.position[1] > 5 && bond.to.position[1] < 5)]
 FP_his = Vector{Float64}()
 disp_his = Vector{Float64}()
-
 
 SL_increment = 0.01
 dt = grid_spacing / sqrt(maximum([material.bond_constant/material.density for material in materials])) * 0.01
@@ -94,11 +89,12 @@ for time_step in 1:300
 
     push!(FP_his, (sum([PD.get_force(bond)[1] for bond in FP_positive_bonds]) - sum([PD.get_force(bond)[1] for bond in FP_negative_bonds]))*0.5)
     push!(disp_his, time_step * SL_increment)
-
 end
 
 import Plots
 Plots.xlabel!("Strain [nm/nm]")
 Plots.ylabel!("Force [nm]")
 print("Max force = ", maximum(FP_his))
-Plots.plot(disp_his/10.0, FP_his, label="Force plane")
+
+Plots.plot(disp_his/10.0, FP_his, label="Peridynamic force response")
+Plots.plot!([row[1] for row in PD.strainForce], [row[2] for row in PD.strainForce],label="MD Simulation")

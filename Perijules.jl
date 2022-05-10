@@ -49,7 +49,8 @@ println("Created ", length(nodes), " nodes!")
 
 # Create Bonds (double bonded)
 bonds = Vector{PD.Bond}()
-cell_list = PD.create_cell_list(nodes, horizon);
+@time cell_list = PD.create_cell_list(nodes, horizon);
+@time cell_list = PD.create_cell_list_new(nodes, horizon);
 for node in nodes
     # Can have lots of optimizations here
     for other in PD.sample_cell_list(cell_list, node, horizon)
