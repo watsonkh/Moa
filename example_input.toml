@@ -1,15 +1,32 @@
 dimension = 1
-horizon = 3.014
+gridspacing = 2.0
+horizon = 6.03
 
 [[Grid]]
     path = "twopoints.grid"
 
 [MaterialDefault]
+    type = "LinearElastic"
     id = 1
     density = 10.4
+    bond_constant = 1.0
+    critical_strain = 0.2
+    
+[[Material]]
+    type = "LinearElastic"
+    id = 2
+    density = 12.2
+    bond_constant = 3.1
+    critical_strain = 0.14
+
+[[Material]]
+    type = "CustomMaterial"
+    id = 3
+    density = 12.2
 
 
 [[BC]]
+    type = "Displacement"
     displacement = [0, 0, 0]
     [[BC.include]]
         sphere = [0,0,0,10]

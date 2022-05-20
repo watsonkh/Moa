@@ -8,6 +8,8 @@ end
 
 import Pkg
 Pkg.activate(".")
+Pkg.add("StaticArrays")
+
 
 import NearestNeighbors
 using StaticArrays

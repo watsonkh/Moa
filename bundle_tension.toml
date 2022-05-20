@@ -1,0 +1,28 @@
+gridspacing = 2.0
+horizon = 3.014
+
+[[Grid]]
+    path = "testgrid.grid"
+[[Grid]]
+    path = "testgrid.grid"
+
+[MaterialDefault]
+    type = "custom"
+    strainforce = "strain-force.csv"
+    id = 1
+    density = 10.4
+
+
+
+[[BC]]
+    displacement = [0, 0, 0]
+    [[BC.include]]
+        sphere = [0,0,0,10]
+    [[BC.exclude]]
+        cuboid = [0, 0, 0, 1, 1, 1]
+    [[BC.exclude]]
+        sphere = [0, 0, 0, 1, 1, 1]
+    [[BC.exclude]]
+        material = 1
+
+[Output]
